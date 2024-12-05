@@ -14,7 +14,6 @@ jobs:
       - uses: "ncipollo/release-action@v1"
         with:
           artifacts: "bin/language-server.js"
+          body: "This artifact was built on $(date +%Y-%m-%d_%H-%M-%S)."
           commit: "${{ github.sha }}"
-          tag: >-
-            v
-            $(date +%Y-%m-%d_%H-%M-%S)
+          makeLatest: "legacy"
