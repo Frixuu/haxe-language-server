@@ -1,0 +1,18 @@
+name: "Release prebuilt language server"
+
+on: ["workflow_dispatch"]
+
+jobs:
+  build:
+    runs-on: "ubuntu-latest"
+    permissions:
+      contents: "write"
+    steps:
+      - uses: "actions/checkout@v4"
+      - run: "npm ci"
+      - run: "npx lix run vshaxe-build -t language-server"
+      - uses: "ncipollo/release-action@v1"
+        with:
+          artifacts: "bin/language-server.js"
+          commit: "${{ github.sha }}"
+          tag: "built-on-$(date +%Y-%m-%d_%H-%M-%S)"
