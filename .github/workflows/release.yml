@@ -16,7 +16,7 @@ jobs:
       - run: npx lix run vshaxe-build -t language-server
       - uses: "ncipollo/release-action@v1"
         with:
-          artifacts: "bin/language-server.js"
+          artifacts: "bin/server.js"
           body: "This artifact was built on $TIMESTAMP."
           commit: "${{ github.sha }}"
           makeLatest: "legacy"
