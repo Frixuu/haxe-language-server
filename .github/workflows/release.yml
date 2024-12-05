@@ -8,9 +8,9 @@ jobs:
     permissions:
       contents: "write"
     steps:
-      - name: "Store timestamp"
-        run: |
-          echo "TIMESTAMP=$(date +%Y-%m-%d_%H-%M-%S)" >> "$GITHUB_ENV"
+      - name: "Store current timestamp"
+        id: timestamp
+        run: echo "DATE=$(date +%Y-%m-%d_%H-%M-%S)" >> "$GITHUB_OUTPUT"
       - uses: "actions/checkout@v4"
       - run: npm ci
       - run: npx lix run vshaxe-build -t language-server
@@ -20,5 +20,4 @@ jobs:
           body: "This artifact was built on $TIMESTAMP."
           commit: "${{ github.sha }}"
           makeLatest: "legacy"
-          tag: |
-            $TIMESTAMP
+          tag: "v${{ steps.timestamp.outputs.DATE }}"
