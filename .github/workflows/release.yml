@@ -15,4 +15,6 @@ jobs:
         with:
           artifacts: "bin/language-server.js"
           commit: "${{ github.sha }}"
-          tag: "built-on-$(date +%Y-%m-%d_%H-%M-%S)"
+          tag: >-
+            v
+            $(date +%Y-%m-%d_%H-%M-%S)
