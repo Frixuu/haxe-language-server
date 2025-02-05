@@ -22,12 +22,15 @@ import haxeLanguageServer.features.haxe.GotoDefinitionFeature;
 import haxeLanguageServer.features.haxe.GotoImplementationFeature;
 import haxeLanguageServer.features.haxe.GotoTypeDefinitionFeature;
 import haxeLanguageServer.features.haxe.InlayHintFeature;
+import haxeLanguageServer.features.haxe.InlineValueFeature;
+import haxeLanguageServer.features.haxe.RefactorFeature;
 import haxeLanguageServer.features.haxe.RenameFeature;
 import haxeLanguageServer.features.haxe.SignatureHelpFeature;
 import haxeLanguageServer.features.haxe.WorkspaceSymbolsFeature;
 import haxeLanguageServer.features.haxe.codeAction.CodeActionFeature;
 import haxeLanguageServer.features.haxe.documentSymbols.DocumentSymbolsFeature;
 import haxeLanguageServer.features.haxe.foldingRange.FoldingRangeFeature;
+import haxeLanguageServer.features.haxe.refactoring.RefactorCache;
 import haxeLanguageServer.server.DisplayResult;
 import haxeLanguageServer.server.HaxeServer;
 import haxeLanguageServer.server.ServerRecording;
@@ -40,6 +43,7 @@ import languageServerProtocol.protocol.ColorProvider.DocumentColorRequest;
 import languageServerProtocol.protocol.FoldingRange.FoldingRangeRequest;
 import languageServerProtocol.protocol.Implementation;
 import languageServerProtocol.protocol.InlayHints;
+import languageServerProtocol.protocol.InlineValue.InlineValueRequest;
 import languageServerProtocol.protocol.Messages.ProtocolRequestType;
 import languageServerProtocol.protocol.Progress;
 import languageServerProtocol.protocol.TypeDefinition.TypeDefinitionRequest;
@@ -64,6 +68,7 @@ class Context {
 	@:nullSafety(Off) public var findReferences(default, null):FindReferencesFeature;
 	@:nullSafety(Off) public var determinePackage(default, null):DeterminePackageFeature;
 	@:nullSafety(Off) public var diagnostics(default, null):DiagnosticsFeature;
+	@:nullSafety(Off) public var refactorCache(default, null):RefactorCache;
 	public var experimental(default, null):Null<ExperimentalCapabilities>;
 
 	var activeEditor:Null<DocumentUri>;
@@ -299,6 +304,12 @@ class Context {
 			capabilities.inlayHintProvider = true;
 		}
 
+		if (textDocument?.inlineValue?.dynamicRegistration == true) {
+			register(InlineValueRequest.type, haxeSelector);
+		} else {
+			capabilities.inlineValueProvider = true;
+		}
+
 		resolve({capabilities: capabilities});
 		languageServerProtocol.sendRequest(RegistrationRequest.type, {registrations: registrations}, null, _ -> {}, error -> trace(error));
 	}
@@ -376,11 +387,13 @@ class Context {
 				new GotoTypeDefinitionFeature(this);
 				findReferences = new FindReferencesFeature(this);
 				determinePackage = new DeterminePackageFeature(this);
-				new RenameFeature(this);
+				refactorCache = new RefactorCache(this);
+				new RenameFeature(this, refactorCache);
 				diagnostics = new DiagnosticsFeature(this);
 				new CodeActionFeature(this);
 				new CodeLensFeature(this);
 				new WorkspaceSymbolsFeature(this);
+				new InlineValueFeature(this, refactorCache);
 
 				for (doc in documents) {
 					publishDiagnostics(doc.uri);
@@ -390,6 +403,7 @@ class Context {
 		} else {
 			haxeServer.restart(reason, function() {
 				onServerStarted();
+				refactorCache.initClassPaths();
 				if (activeEditor != null) {
 					publishDiagnostics(activeEditor);
 				}
@@ -416,6 +430,7 @@ class Context {
 			serverRecording.onDidChangeTextDocument(event);
 			invalidateFile(uri);
 			documents.onDidChangeTextDocument(event);
+			refactorCache.invalidateFile(uri.toFsPath().toString());
 		}
 	}
 
@@ -432,6 +447,7 @@ class Context {
 		if (isUriSupported(uri)) {
 			publishDiagnostics(uri);
 			invalidated.remove(uri.toString());
+			refactorCache.invalidateFile(uri.toFsPath().toString());
 		}
 	}
 
@@ -446,6 +462,9 @@ class Context {
 					diagnostics.clearDiagnostics(change.uri);
 					invalidateFile(change.uri);
 				case _:
+			}
+			if (change.uri.isHaxeFile()) {
+				refactorCache.invalidateFile(change.uri.toFsPath().toString());
 			}
 		}
 	}
@@ -466,6 +485,9 @@ class Context {
 	}
 
 	function onDidChangeActiveTextEditor(params:{uri:DocumentUri}) {
+		if (!params.uri.isFile() || !params.uri.isHaxeFile()) {
+			return;
+		}
 		activeEditor = params.uri;
 		final document = documents.getHaxe(params.uri);
 		if (document == null) {
