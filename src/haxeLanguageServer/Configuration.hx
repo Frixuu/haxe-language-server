@@ -4,6 +4,7 @@ import haxe.DynamicAccess;
 import haxe.Json;
 import haxe.extern.EitherType;
 import haxeLanguageServer.helper.StructDefaultsMacro;
+import haxeLanguageServer.helper.ZedHelper;
 import jsonrpc.Protocol;
 
 typedef HaxelibConfig = {
@@ -243,7 +244,7 @@ class Configuration {
 		var options:Null<InitOptions> = params.initializationOptions;
 		StructDefaultsMacro.applyDefaults(options, DefaultInitOptions);
 		displayServer = options.displayServerConfig;
-		displayArguments = options.displayArguments;
+		displayArguments = ZedHelper.removeOneRepeat(options.displayArguments);
 		haxelib = options.haxelibConfig;
 		sendMethodResults = options.sendMethodResults;
 	}
